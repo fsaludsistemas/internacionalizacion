@@ -171,6 +171,11 @@
   color: #0f5f20;
 }
 
+.message.success {
+  background: #d4edda;
+  color: #155724;
+}
+
 .timeline {
   position: relative;
   margin-top: 16px;

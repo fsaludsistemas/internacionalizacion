@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import {
   apiGetAllSheets,
   apiPost,
+  apiPostForm,
   getSheetRows,
   isUnauthorizedError,
   pickValue,
@@ -210,6 +211,11 @@ const UserPage = () => {
     urlSoporte: "",
     urlDocumento: "",
     diligenciaDoc: "",
+  });
+  const [fileUpload, setFileUpload] = useState({
+    uploading: false,
+    fileName: "",
+    error: "",
   });
 
   const activitiesByProcess = useMemo(() => {
@@ -477,6 +483,37 @@ const UserPage = () => {
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
+  const handleFileChange = async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setFileUpload({ uploading: true, fileName: file.name, error: "" });
+    setFormData((prev) => ({ ...prev, urlDocumento: "" }));
+
+    try {
+      const body = new FormData();
+      body.append("file", file);
+      const response = await apiPostForm(
+        "/api/sheets/documentos/upload",
+        body,
+        auth.token,
+      );
+      const url = response?.data?.data?.url ?? "";
+      if (!url) throw new Error("El servidor no devolvió una URL del archivo.");
+      setFormData((prev) => ({ ...prev, urlDocumento: url }));
+      setFileUpload({ uploading: false, fileName: file.name, error: "" });
+    } catch (uploadError) {
+      const msg =
+        uploadError?.response?.data?.message ||
+        uploadError?.message ||
+        "Error al subir el archivo.";
+      setFileUpload({ uploading: false, fileName: "", error: msg });
+      setFormData((prev) => ({ ...prev, urlDocumento: "" }));
+      // Reset the input so the user can try again
+      event.target.value = "";
+    }
+  };
+
   const handleProcessChange = (event) => {
     setSelectedProcessId(event.target.value);
     setFormMessage("");
@@ -718,6 +755,7 @@ const UserPage = () => {
         urlDocumento: "",
         diligenciaDoc: "",
       });
+      setFileUpload({ uploading: false, fileName: "", error: "" });
       setFormMessage(
         solicitudToUse
           ? "Registro enviado correctamente para la actividad."
@@ -943,18 +981,34 @@ const UserPage = () => {
 
                       {requiresAttachment ? (
                         <>
-                          <label htmlFor="urlDocumento">
-                            URL del documento exigido
+                          <label htmlFor="archivoDocumento">
+                            Adjuntar documento obligatorio
                           </label>
                           <input
-                            id="urlDocumento"
-                            name="urlDocumento"
-                            type="url"
-                            placeholder="https://ejemplo.com/documento-obligatorio"
-                            value={formData.urlDocumento}
-                            onChange={handleChange}
-                            required
+                            id="archivoDocumento"
+                            name="archivoDocumento"
+                            type="file"
+                            accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg"
+                            onChange={handleFileChange}
+                            disabled={fileUpload.uploading}
+                            required={!formData.urlDocumento}
                           />
+                          {fileUpload.uploading ? (
+                            <p className="message info">Subiendo archivo...</p>
+                          ) : fileUpload.error ? (
+                            <p className="message error">{fileUpload.error}</p>
+                          ) : formData.urlDocumento ? (
+                            <p className="message success">
+                              ✓ Archivo subido:{" "}
+                              <a
+                                href={formData.urlDocumento}
+                                target="_blank"
+                                rel="noreferrer"
+                              >
+                                {fileUpload.fileName}
+                              </a>
+                            </p>
+                          ) : null}
                         </>
                       ) : null}
 
